@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# Environment variables (NEVER commit)
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+*.pkl
+*.joblib
+
+# Prisma
+packages/database/prisma/migrations/*.lock
+
+# Mobile
+apps/mobile/.expo/
+apps/mobile/ios/
+apps/mobile/android/
+
+# Misc
+*.tsbuildinfo
+.eslintcache

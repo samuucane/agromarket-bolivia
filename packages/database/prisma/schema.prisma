@@ -1,0 +1,874 @@
+// AgroMarket Bolivia — Prisma Schema Completo
+// PostgreSQL 15 + PostGIS
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis, uuid_ossp]
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  PRODUCER
+  BUYER
+  SUPPLIER
+  MACHINERY_OWNER
+  FINANCIAL_INST
+  FIELD_AGENT
+  COOPERATIVE
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum KycStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum CropType {
+  GRAIN
+  VEGETABLE
+  FRUIT
+  LIVESTOCK
+  INDUSTRIAL
+  OTHER
+}
+
+enum BuyerType {
+  AGROINDUSTRY
+  SUPERMARKET
+  RESTAURANT
+  EXPORTER
+  COOPERATIVE
+  OTHER
+}
+
+enum ListingType {
+  SELL
+  BUY_REQUEST
+  RENT
+}
+
+enum ProductType {
+  AGRICULTURAL_PRODUCT
+  SUPPLY
+  MACHINERY
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  SOLD
+  EXPIRED
+  REMOVED
+}
+
+enum CategoryType {
+  AGRICULTURAL
+  SUPPLY
+  MACHINERY
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  IN_NEGOTIATION
+  PAYMENT_PENDING
+  PAID
+  IN_DELIVERY
+  COMPLETED
+  DISPUTED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  QR_BOLIVIA
+  BANK_TRANSFER
+  CASH
+  CREDIT_PLATFORM
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DeliveryType {
+  PICKUP
+  DELIVERY
+  NEGOTIATED
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+  WITHDRAWAL
+  DEPOSIT
+  PLATFORM_FEE
+  CREDIT_DISBURSEMENT
+  CREDIT_PAYMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum QrStatus {
+  PENDING
+  SCANNED
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum CreditPurpose {
+  SEEDS
+  FERTILIZERS
+  AGROCHEMICALS
+  MACHINERY
+  WORKING_CAPITAL
+  INFRASTRUCTURE
+  OTHER
+}
+
+enum CreditStatus {
+  SUBMITTED
+  SCORING
+  APPROVED
+  REJECTED
+  PENDING_DOCS
+  DISBURSED
+  CANCELLED
+}
+
+enum LoanStatus {
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+  RESTRUCTURED
+  WRITTEN_OFF
+}
+
+enum CycleStatus {
+  PLANNED
+  ACTIVE
+  HARVESTED
+  FAILED
+  CANCELLED
+}
+
+enum ExpenseCategory {
+  SEEDS
+  FERTILIZER
+  PESTICIDE
+  LABOR
+  MACHINERY
+  IRRIGATION
+  PACKAGING
+  TRANSPORT
+  CERTIFICATION
+  OTHER
+}
+
+enum AlertType {
+  FROST
+  DROUGHT
+  FLOOD
+  PEST
+  MARKET_PRICE
+  HARVEST_REMINDER
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  DANGER
+  CRITICAL
+}
+
+enum CertType {
+  ORGANIC
+  AGROECOLOGICAL
+  FAIR_TRADE
+  FOOD_SAFETY
+  EXPORT_PERMIT
+  PHYTOSANITARY
+  QUALITY_STANDARD
+}
+
+enum CertStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum NotificationChannel {
+  PUSH
+  WHATSAPP
+  SMS
+  IN_APP
+}
+
+enum RiskTier {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODULE 1 — AUTH & USERS
+// ─────────────────────────────────────────────────────────────────
+
+model User {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone          String     @unique @db.VarChar(20)
+  email          String?    @unique @db.VarChar(255)
+  passwordHash   String?    @map("password_hash")
+  pinHash        String?    @map("pin_hash")
+  role           UserRole   @default(PRODUCER)
+  status         UserStatus @default(PENDING_VERIFICATION)
+  language       String     @default("es") @db.VarChar(10)
+  firebaseToken  String?    @map("firebase_token")
+  whatsappOptIn  Boolean    @default(true) @map("whatsapp_opt_in")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  lastLoginAt    DateTime?  @map("last_login_at")
+  deletedAt      DateTime?  @map("deleted_at")
+
+  // Relations
+  producerProfile      ProducerProfile?
+  buyerProfile         BuyerProfile?
+  supplierProfile      SupplierProfile?
+  wallet               Wallet?
+  sessionsAsUser       RefreshToken[]
+  otpVerifications     OtpVerification[]
+  listingsAsSeller     Listing[]          @relation("SellerListings")
+  ordersAsBuyer        Order[]            @relation("BuyerOrders")
+  ordersAsSeller       Order[]            @relation("SellerOrders")
+  reviewsGiven         Review[]           @relation("ReviewsGiven")
+  reviewsReceived      Review[]           @relation("ReviewsReceived")
+  transactions         Transaction[]
+  notifications        Notification[]
+  bankAccounts         BankAccount[]
+  creditApplications   CreditApplication[]
+  creditLoans          CreditLoan[]
+  kyc                  KycDocument[]
+
+  @@map("users")
+}
+
+model ProducerProfile {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @unique @map("user_id") @db.Uuid
+  fullName            String    @map("full_name") @db.VarChar(200)
+  nationalId          String?   @map("national_id") @db.VarChar(20)
+  nationalIdVerified  Boolean   @default(false) @map("national_id_verified")
+  department          String    @db.VarChar(50)
+  municipality        String    @db.VarChar(100)
+  community           String?   @db.VarChar(150)
+  latitude            Float?
+  longitude           Float?
+  totalHectares       Decimal?  @map("total_hectares") @db.Decimal(10, 2)
+  farmDescription     String?   @map("farm_description")
+  kycStatus           KycStatus @default(PENDING) @map("kyc_status")
+  kycSubmittedAt      DateTime? @map("kyc_submitted_at")
+  kycApprovedAt       DateTime? @map("kyc_approved_at")
+  certificationLevel  String    @default("BASIC") @map("certification_level") @db.VarChar(20)
+  creditScore         Int?      @map("credit_score")
+  creditScoreUpdatedAt DateTime? @map("credit_score_updated_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crops         ProducerCrop[]
+  farms         Farm[]
+  certifications Certification[]
+
+  @@map("producer_profiles")
+}
+
+model ProducerCrop {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  producerId  String   @map("producer_id") @db.Uuid
+  cropName    String   @map("crop_name") @db.VarChar(100)
+  cropType    CropType @map("crop_type")
+  hectares    Decimal? @db.Decimal(8, 2)
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  producer ProducerProfile @relation(fields: [producerId], references: [id], onDelete: Cascade)
+
+  @@map("producer_crops")
+}
+
+model BuyerProfile {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @unique @map("user_id") @db.Uuid
+  companyName      String    @map("company_name") @db.VarChar(200)
+  nit              String?   @db.VarChar(20)
+  nitVerified      Boolean   @default(false) @map("nit_verified")
+  buyerType        BuyerType @map("buyer_type")
+  department       String?   @db.VarChar(50)
+  address          String?
+  monthlyVolumebs  Decimal?  @map("monthly_volume_bs") @db.Decimal(15, 2)
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("buyer_profiles")
+}
+
+model SupplierProfile {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  companyName    String   @map("company_name") @db.VarChar(200)
+  nit            String?  @db.VarChar(20)
+  supplyTypes    String[]
+  departments    String[]
+  paymentTerms   Int      @default(30) @map("payment_terms")
+  membershipTier String   @default("BASIC") @map("membership_tier") @db.VarChar(20)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_profiles")
+}
+
+model OtpVerification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone     String    @db.VarChar(20)
+  otpHash   String    @map("otp_hash")
+  purpose   String    @db.VarChar(50)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  userId    String?   @map("user_id") @db.Uuid
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("otp_verifications")
+}
+
+model RefreshToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model KycDocument {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  docType      String    @map("doc_type") @db.VarChar(50)
+  frontUrl     String?   @map("front_url")
+  backUrl      String?   @map("back_url")
+  selfieUrl    String?   @map("selfie_url")
+  status       KycStatus @default(PENDING)
+  reviewedBy   String?   @map("reviewed_by") @db.Uuid
+  reviewedAt   DateTime? @map("reviewed_at")
+  rejectionReason String? @map("rejection_reason")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODULE 2 — MARKETPLACE
+// ─────────────────────────────────────────────────────────────────
+
+model Category {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String       @db.VarChar(100)
+  nameAy     String?      @map("name_ay") @db.VarChar(100)
+  nameQu     String?      @map("name_qu") @db.VarChar(100)
+  slug       String       @unique @db.VarChar(120)
+  parentId   String?      @map("parent_id") @db.Uuid
+  type       CategoryType
+  iconUrl    String?      @map("icon_url")
+  isActive   Boolean      @default(true) @map("is_active")
+  sortOrder  Int          @default(0) @map("sort_order")
+
+  parent         Category?       @relation("CategoryTree", fields: [parentId], references: [id])
+  children       Category[]      @relation("CategoryTree")
+  listings       Listing[]
+  priceHistories PriceHistory[]
+
+  @@map("categories")
+}
+
+model Listing {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sellerId          String        @map("seller_id") @db.Uuid
+  categoryId        String        @map("category_id") @db.Uuid
+  title             String        @db.VarChar(250)
+  description       String?
+  listingType       ListingType   @map("listing_type")
+  productType       ProductType   @map("product_type")
+  quantity          Decimal?      @db.Decimal(12, 2)
+  unit              String?       @db.VarChar(30)
+  pricePerUnit      Decimal       @map("price_per_unit") @db.Decimal(15, 2)
+  currency          String        @default("BOB") @db.VarChar(5)
+  minOrder          Decimal?      @map("min_order") @db.Decimal(12, 2)
+  maxOrder          Decimal?      @map("max_order") @db.Decimal(12, 2)
+  locationDept      String?       @map("location_dept") @db.VarChar(50)
+  locationMuni      String?       @map("location_muni") @db.VarChar(100)
+  latitude          Float?
+  longitude         Float?
+  harvestDate       DateTime?     @map("harvest_date") @db.Date
+  expiryDate        DateTime?     @map("expiry_date") @db.Date
+  isNegotiable      Boolean       @default(true) @map("is_negotiable")
+  isOrganic         Boolean       @default(false) @map("is_organic")
+  hasCertification  Boolean       @default(false) @map("has_certification")
+  certificationType String?       @map("certification_type") @db.VarChar(50)
+  status            ListingStatus @default(ACTIVE)
+  viewsCount        Int           @default(0) @map("views_count")
+  featuredUntil     DateTime?     @map("featured_until")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  expiresAt         DateTime?     @map("expires_at")
+
+  seller   User          @relation("SellerListings", fields: [sellerId], references: [id], onDelete: Cascade)
+  category Category      @relation(fields: [categoryId], references: [id])
+  images   ListingImage[]
+  orders   Order[]
+  creditApplications CreditApplication[]
+
+  @@map("listings")
+}
+
+model ListingImage {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId    String   @map("listing_id") @db.Uuid
+  url          String
+  thumbnailUrl String?  @map("thumbnail_url")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@map("listing_images")
+}
+
+model PriceHistory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  productName String   @map("product_name") @db.VarChar(150)
+  department  String?  @db.VarChar(50)
+  avgPrice    Decimal  @map("avg_price") @db.Decimal(12, 4)
+  minPrice    Decimal  @map("min_price") @db.Decimal(12, 4)
+  maxPrice    Decimal  @map("max_price") @db.Decimal(12, 4)
+  currency    String   @default("BOB") @db.VarChar(5)
+  unit        String?  @db.VarChar(30)
+  sampleCount Int      @map("sample_count")
+  recordedAt  DateTime @default(now()) @map("recorded_at")
+
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@map("price_history")
+}
+
+model Order {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNumber        String         @unique @map("order_number") @db.VarChar(20)
+  listingId          String?        @map("listing_id") @db.Uuid
+  buyerId            String         @map("buyer_id") @db.Uuid
+  sellerId           String         @map("seller_id") @db.Uuid
+  quantity           Decimal        @db.Decimal(12, 2)
+  unitPrice          Decimal        @map("unit_price") @db.Decimal(15, 2)
+  subtotal           Decimal        @db.Decimal(15, 2)
+  platformFee        Decimal        @map("platform_fee") @db.Decimal(15, 2)
+  total              Decimal        @db.Decimal(15, 2)
+  currency           String         @default("BOB") @db.VarChar(5)
+  status             OrderStatus    @default(PENDING)
+  paymentMethod      PaymentMethod? @map("payment_method")
+  paymentStatus      PaymentStatus  @default(PENDING) @map("payment_status")
+  paymentRef         String?        @map("payment_ref") @db.VarChar(100)
+  deliveryType       DeliveryType?  @map("delivery_type")
+  deliveryAddress    String?        @map("delivery_address")
+  deliveryDate       DateTime?      @map("delivery_date") @db.Date
+  notes              String?
+  creditUsed         Boolean        @default(false) @map("credit_used")
+  creditAmount       Decimal?       @map("credit_amount") @db.Decimal(15, 2)
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+  completedAt        DateTime?      @map("completed_at")
+  cancelledAt        DateTime?      @map("cancelled_at")
+  cancellationReason String?        @map("cancellation_reason")
+
+  listing     Listing?            @relation(fields: [listingId], references: [id])
+  buyer       User                @relation("BuyerOrders", fields: [buyerId], references: [id])
+  seller      User                @relation("SellerOrders", fields: [sellerId], references: [id])
+  statusHistory OrderStatusHistory[]
+  review      Review?
+  transactions Transaction[]
+  qrPayments  QrPayment[]
+
+  @@map("orders")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String      @map("order_id") @db.Uuid
+  status    OrderStatus
+  note      String?
+  changedBy String?     @map("changed_by") @db.Uuid
+  changedAt DateTime    @default(now()) @map("changed_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_status_history")
+}
+
+model Review {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String   @unique @map("order_id") @db.Uuid
+  reviewerId String   @map("reviewer_id") @db.Uuid
+  reviewedId String   @map("reviewed_id") @db.Uuid
+  rating     Int      @db.SmallInt
+  comment    String?
+  reviewType String   @map("review_type") @db.VarChar(20)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  order    Order @relation(fields: [orderId], references: [id])
+  reviewer User  @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  reviewed User  @relation("ReviewsReceived", fields: [reviewedId], references: [id])
+
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODULE 3 — PAYMENTS
+// ─────────────────────────────────────────────────────────────────
+
+model Wallet {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @unique @map("user_id") @db.Uuid
+  balance      Decimal  @default(0.00) @db.Decimal(15, 2)
+  currency     String   @default("BOB") @db.VarChar(5)
+  isFrozen     Boolean  @default(false) @map("is_frozen")
+  freezeReason String?  @map("freeze_reason")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sentTransactions  Transaction[] @relation("FromWallet")
+  recvTransactions  Transaction[] @relation("ToWallet")
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transactionRef String            @unique @map("transaction_ref") @db.VarChar(50)
+  orderId        String?           @map("order_id") @db.Uuid
+  fromWalletId   String?           @map("from_wallet_id") @db.Uuid
+  toWalletId     String?           @map("to_wallet_id") @db.Uuid
+  userId         String?           @map("user_id") @db.Uuid
+  amount         Decimal           @db.Decimal(15, 2)
+  feeAmount      Decimal           @default(0) @map("fee_amount") @db.Decimal(15, 2)
+  netAmount      Decimal           @map("net_amount") @db.Decimal(15, 2)
+  currency       String            @default("BOB") @db.VarChar(5)
+  type           TransactionType
+  method         PaymentMethod
+  status         TransactionStatus @default(PENDING)
+  externalRef    String?           @map("external_ref") @db.VarChar(200)
+  metadata       Json?
+  processedAt    DateTime?         @map("processed_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  order      Order?       @relation(fields: [orderId], references: [id])
+  fromWallet Wallet?      @relation("FromWallet", fields: [fromWalletId], references: [id])
+  toWallet   Wallet?      @relation("ToWallet", fields: [toWalletId], references: [id])
+  user       User?        @relation(fields: [userId], references: [id])
+  loanPayment LoanPayment?
+
+  @@map("transactions")
+}
+
+model QrPayment {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String    @map("order_id") @db.Uuid
+  qrCode        String    @map("qr_code")
+  qrImageUrl    String?   @map("qr_image_url")
+  amount        Decimal   @db.Decimal(15, 2)
+  currency      String    @default("BOB") @db.VarChar(5)
+  description   String?
+  expiresAt     DateTime  @map("expires_at")
+  scannedAt     DateTime? @map("scanned_at")
+  paidAt        DateTime? @map("paid_at")
+  status        QrStatus  @default(PENDING)
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("qr_payments")
+}
+
+model BankAccount {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  bankName      String   @map("bank_name") @db.VarChar(100)
+  accountNumber String   @map("account_number") @db.VarChar(50)
+  accountType   String?  @map("account_type") @db.VarChar(20)
+  isVerified    Boolean  @default(false) @map("is_verified")
+  isPrimary     Boolean  @default(false) @map("is_primary")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("bank_accounts")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODULE 4 — CREDIT ENGINE
+// ─────────────────────────────────────────────────────────────────
+
+model CreditApplication {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicantId     String        @map("applicant_id") @db.Uuid
+  purpose         CreditPurpose
+  requestedAmount Decimal       @map("requested_amount") @db.Decimal(15, 2)
+  requestedTerm   Int           @map("requested_term")
+  currency        String        @default("BOB") @db.VarChar(5)
+  linkedOrderId   String?       @map("linked_order_id") @db.Uuid
+  linkedListingId String?       @map("linked_listing_id") @db.Uuid
+  scoringSnapshot Json          @map("scoring_snapshot")
+  creditScore     Int?          @map("credit_score")
+  riskTier        RiskTier?     @map("risk_tier")
+  status          CreditStatus  @default(SUBMITTED)
+  assignedToBank  String?       @map("assigned_to_bank") @db.VarChar(100)
+  bankRef         String?       @map("bank_ref") @db.VarChar(100)
+  approvedAmount  Decimal?      @map("approved_amount") @db.Decimal(15, 2)
+  approvedRate    Decimal?      @map("approved_rate") @db.Decimal(6, 4)
+  approvedTerm    Int?          @map("approved_term")
+  platformFeeRate Decimal?      @map("platform_fee_rate") @db.Decimal(4, 4)
+  platformFeeAmount Decimal?    @map("platform_fee_amount") @db.Decimal(12, 2)
+  notes           String?
+  submittedAt     DateTime      @default(now()) @map("submitted_at")
+  reviewedAt      DateTime?     @map("reviewed_at")
+  approvedAt      DateTime?     @map("approved_at")
+  disbursedAt     DateTime?     @map("disbursed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  applicant      User           @relation(fields: [applicantId], references: [id])
+  linkedOrder    Order?         @relation(fields: [linkedOrderId], references: [id])
+  linkedListing  Listing?       @relation(fields: [linkedListingId], references: [id])
+  loan           CreditLoan?
+
+  @@map("credit_applications")
+}
+
+model CreditLoan {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId     String     @unique @map("application_id") @db.Uuid
+  borrowerId        String     @map("borrower_id") @db.Uuid
+  principal         Decimal    @db.Decimal(15, 2)
+  interestRate      Decimal    @map("interest_rate") @db.Decimal(6, 4)
+  termMonths        Int        @map("term_months")
+  monthlyPayment    Decimal    @map("monthly_payment") @db.Decimal(15, 2)
+  totalToPay        Decimal    @map("total_to_pay") @db.Decimal(15, 2)
+  outstandingBalance Decimal   @map("outstanding_balance") @db.Decimal(15, 2)
+  status            LoanStatus @default(ACTIVE)
+  disbursedAt       DateTime   @map("disbursed_at")
+  nextPaymentDate   DateTime   @map("next_payment_date") @db.Date
+  completedAt       DateTime?  @map("completed_at")
+  defaultedAt       DateTime?  @map("defaulted_at")
+
+  application CreditApplication @relation(fields: [applicationId], references: [id])
+  borrower    User               @relation(fields: [borrowerId], references: [id])
+  payments    LoanPayment[]
+
+  @@map("credit_loans")
+}
+
+model LoanPayment {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loanId        String    @map("loan_id") @db.Uuid
+  transactionId String?   @unique @map("transaction_id") @db.Uuid
+  paymentNumber Int       @map("payment_number")
+  amount        Decimal   @db.Decimal(15, 2)
+  principalPaid Decimal?  @map("principal_paid") @db.Decimal(15, 2)
+  interestPaid  Decimal?  @map("interest_paid") @db.Decimal(15, 2)
+  isLate        Boolean   @default(false) @map("is_late")
+  daysLate      Int?      @map("days_late")
+  paymentDate   DateTime? @map("payment_date") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  loan        CreditLoan   @relation(fields: [loanId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@map("loan_payments")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODULE 5 — FARM MANAGER
+// ─────────────────────────────────────────────────────────────────
+
+model Farm {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  producerId   String   @map("producer_id") @db.Uuid
+  name         String   @db.VarChar(200)
+  totalHectares Decimal @map("total_hectares") @db.Decimal(10, 2)
+  locationDept String?  @map("location_dept") @db.VarChar(50)
+  locationMuni String?  @map("location_muni") @db.VarChar(100)
+  latitude     Float?
+  longitude    Float?
+  soilType     String?  @map("soil_type") @db.VarChar(50)
+  waterSource  String?  @map("water_source") @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  producer ProducerProfile @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  cycles   CropCycle[]
+  alerts   FarmAlert[]
+
+  @@map("farms")
+}
+
+model CropCycle {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmId          String      @map("farm_id") @db.Uuid
+  cropName        String      @map("crop_name") @db.VarChar(100)
+  variety         String?     @db.VarChar(100)
+  plantedHectares Decimal     @map("planted_hectares") @db.Decimal(8, 2)
+  plantingDate    DateTime    @map("planting_date") @db.Date
+  expectedHarvest DateTime?   @map("expected_harvest") @db.Date
+  actualHarvest   DateTime?   @map("actual_harvest") @db.Date
+  status          CycleStatus @default(ACTIVE)
+  expectedYield   Decimal?    @map("expected_yield") @db.Decimal(10, 2)
+  actualYield     Decimal?    @map("actual_yield") @db.Decimal(10, 2)
+  notes           String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  farm     Farm          @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  expenses FarmExpense[]
+
+  @@map("crop_cycles")
+}
+
+model FarmExpense {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId     String          @map("cycle_id") @db.Uuid
+  category    ExpenseCategory
+  description String?         @db.VarChar(255)
+  amount      Decimal         @db.Decimal(12, 2)
+  currency    String          @default("BOB") @db.VarChar(5)
+  expenseDate DateTime        @map("expense_date") @db.Date
+  supplierId  String?         @map("supplier_id") @db.Uuid
+  receiptUrl  String?         @map("receipt_url")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  cycle CropCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  @@map("farm_expenses")
+}
+
+model FarmAlert {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmId    String        @map("farm_id") @db.Uuid
+  alertType AlertType     @map("alert_type")
+  title     String        @db.VarChar(200)
+  message   String
+  severity  AlertSeverity
+  isRead    Boolean       @default(false) @map("is_read")
+  expiresAt DateTime?     @map("expires_at")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  farm Farm @relation(fields: [farmId], references: [id])
+
+  @@map("farm_alerts")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODULE 6 — CERTIFICATIONS
+// ─────────────────────────────────────────────────────────────────
+
+model Certification {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  producerId        String     @map("producer_id") @db.Uuid
+  type              CertType
+  issuingBody       String?    @map("issuing_body") @db.VarChar(200)
+  certificateNumber String?    @map("certificate_number") @db.VarChar(100)
+  documentUrl       String?    @map("document_url")
+  validFrom         DateTime?  @map("valid_from") @db.Date
+  validUntil        DateTime?  @map("valid_until") @db.Date
+  status            CertStatus @default(PENDING)
+  verifiedBy        String?    @map("verified_by") @db.Uuid
+  verifiedAt        DateTime?  @map("verified_at")
+  notes             String?
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  producer ProducerProfile @relation(fields: [producerId], references: [id])
+
+  @@map("certifications")
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODULE 7 — NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  title     String              @db.VarChar(200)
+  message   String
+  channel   NotificationChannel
+  eventType String              @map("event_type") @db.VarChar(50)
+  data      Json?
+  isRead    Boolean             @default(false) @map("is_read")
+  readAt    DateTime?           @map("read_at")
+  sentAt    DateTime?           @map("sent_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model CreditApplicationOrder {
+  creditApplicationId String @map("credit_application_id") @db.Uuid
+  orderId             String @map("order_id") @db.Uuid
+
+  @@id([creditApplicationId, orderId])
+  @@map("credit_application_orders")
+}

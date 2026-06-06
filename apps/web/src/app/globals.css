@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── AgroMarket Design System — CSS Variables ──────────────────────────── */
+@layer base {
+  :root {
+    /* Semantic colours (light mode) */
+    --background: 0 0% 100%;
+    --foreground: 120 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 120 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 120 20% 10%;
+    --primary: 121 48% 33%;       /* am-green-500 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 121 48% 95%;     /* am-green-50 */
+    --secondary-foreground: 121 48% 20%;
+    --muted: 120 10% 96%;
+    --muted-foreground: 120 5% 45%;
+    --accent: 37 90% 55%;         /* am-amber-400 */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 120 10% 90%;
+    --input: 120 10% 90%;
+    --ring: 121 48% 33%;
+    --radius: 0.625rem;
+
+    /* AgroMarket-specific tokens */
+    --am-green-50:  #E8F5E6;
+    --am-green-100: #C8E6C2;
+    --am-green-500: #2D7D2A;
+    --am-green-700: #1A5C38;
+    --am-green-900: #0D3A1A;
+    --am-amber-400: #F5A623;
+    --am-amber-600: #B87D0E;
+    --am-earth-400: #8B5E3C;
+
+    /* Spacing scale (base 4px) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+    --space-16: 64px;
+  }
+
+  .dark {
+    --background: 120 20% 6%;
+    --foreground: 0 0% 95%;
+    --card: 120 15% 9%;
+    --card-foreground: 0 0% 95%;
+    --popover: 120 15% 9%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 121 48% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 120 15% 14%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 120 10% 14%;
+    --muted-foreground: 120 5% 65%;
+    --accent: 37 90% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 120 10% 20%;
+    --input: 120 10% 20%;
+    --ring: 121 48% 45%;
+  }
+}
+
+/* ─── Base styles ──────────────────────────────────────────────────────────── */
+@layer base {
+  * { @apply border-border; }
+
+  body {
+    @apply bg-background text-foreground font-body;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4 { @apply font-display font-semibold tracking-tight; }
+  h1 { @apply text-3xl md:text-4xl; }
+  h2 { @apply text-2xl md:text-3xl; }
+  h3 { @apply text-xl md:text-2xl; }
+  h4 { @apply text-lg md:text-xl; }
+
+  /* Ensure 44px minimum tap targets on mobile */
+  button, [role="button"], a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input, select, textarea {
+    @apply text-base;   /* Prevents zoom on iOS */
+  }
+}
+
+/* ─── Component utilities ──────────────────────────────────────────────────── */
+@layer components {
+  .page-container { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+  .section { @apply py-12 md:py-16; }
+  .card-hover { @apply transition-shadow hover:shadow-md cursor-pointer; }
+
+  /* Product card */
+  .product-card {
+    @apply bg-card rounded-xl border border-border overflow-hidden
+           transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
+  }
+
+  /* Status badges */
+  .badge-active   { @apply bg-am-green-100 text-am-green-700 border-am-green-200; }
+  .badge-pending  { @apply bg-am-amber-50 text-am-amber-600 border-am-amber-100; }
+  .badge-inactive { @apply bg-muted text-muted-foreground border-border; }
+  .badge-error    { @apply bg-red-50 text-red-700 border-red-200; }
+
+  /* Skeleton loader */
+  .skeleton { @apply animate-pulse bg-muted rounded; }
+
+  /* Offline banner */
+  .offline-banner {
+    @apply fixed bottom-0 left-0 right-0 bg-am-amber-400 text-white
+           text-center py-2 text-sm font-medium z-50;
+  }
+
+  /* Gradient hero */
+  .hero-gradient {
+    background: linear-gradient(135deg,
+      var(--am-green-900) 0%,
+      var(--am-green-700) 50%,
+      var(--am-green-500) 100%
+    );
+  }
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground; }
+
+/* ─── Focus visible (accessibility) ────────────────────────────────────────── */
+:focus-visible { @apply outline-none ring-2 ring-ring ring-offset-2; }

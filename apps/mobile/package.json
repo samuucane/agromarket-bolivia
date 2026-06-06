@@ -1,0 +1,36 @@
+{
+  "name": "@agromarket/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "lint": "eslint src/**/*.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native": "^6.1.17",
+    "@react-navigation/stack": "^6.3.29",
+    "@tanstack/react-query": "^5.28.0",
+    "axios": "^1.6.8",
+    "expo": "~50.0.0",
+    "expo-barcode-scanner": "~12.9.0",
+    "expo-camera": "~14.1.0",
+    "expo-local-authentication": "~13.8.0",
+    "expo-notifications": "~0.27.0",
+    "expo-secure-store": "~12.8.0",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-maps": "1.10.0",
+    "react-native-mmkv": "^2.12.2",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/react": "~18.2.45",
+    "typescript": "^5.1.3"
+  }
+}

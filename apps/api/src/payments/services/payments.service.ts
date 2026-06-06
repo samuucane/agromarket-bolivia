@@ -1,0 +1,174 @@
+import {
+  Injectable, NotFoundException, BadRequestException, Logger,
+} from '@nestjs/common';
+import { TransactionType, TransactionStatus, PaymentMethod } from '@prisma/client';
+import { nanoid } from 'nanoid';
+
+import { PrismaService } from '../../database/prisma.service';
+
+@Injectable()
+export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
+  constructor(private prisma: PrismaService) {}
+
+  async getWallet(userId: string) {
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    if (!wallet) {
+      return this.prisma.wallet.create({ data: { userId } });
+    }
+    return wallet;
+  }
+
+  async getTransactions(userId: string, page = 1, limit = 20) {
+    const wallet = await this.getWallet(userId);
+    return this.prisma.paginate('transaction', {
+      where: {
+        OR: [{ fromWalletId: wallet.id }, { toWalletId: wallet.id }, { userId }],
+      },
+      orderBy: { createdAt: 'desc' },
+      page,
+      limit,
+    });
+  }
+
+  async processOrderPayment(orderId: string, method: PaymentMethod) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { buyer: { include: { wallet: true } }, seller: { include: { wallet: true } } },
+    });
+
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (order.paymentStatus === 'COMPLETED') throw new BadRequestException('Pedido ya pagado');
+
+    const buyerWallet = order.buyer.wallet;
+    const sellerWallet = order.seller.wallet;
+
+    if (!buyerWallet) throw new BadRequestException('El comprador no tiene wallet');
+    if (Number(buyerWallet.balance) < Number(order.total)) {
+      throw new BadRequestException('Saldo insuficiente');
+    }
+
+    const txRef = `TXN-${nanoid(12).toUpperCase()}`;
+
+    await this.prisma.$transaction([
+      // Deduct from buyer
+      this.prisma.wallet.update({
+        where: { id: buyerWallet.id },
+        data: { balance: { decrement: order.total } },
+      }),
+      // Credit to seller (net of platform fee)
+      this.prisma.wallet.update({
+        where: { id: sellerWallet!.id },
+        data: { balance: { increment: order.subtotal } },
+      }),
+      // Record main transaction
+      this.prisma.transaction.create({
+        data: {
+          transactionRef: txRef,
+          orderId,
+          fromWalletId: buyerWallet.id,
+          toWalletId: sellerWallet!.id,
+          userId: order.buyerId,
+          amount: order.total,
+          feeAmount: order.platformFee,
+          netAmount: order.subtotal,
+          type: TransactionType.PAYMENT,
+          method,
+          status: TransactionStatus.COMPLETED,
+          processedAt: new Date(),
+        },
+      }),
+      // Update order payment status
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { paymentStatus: 'COMPLETED', paymentRef: txRef, status: 'PAID' },
+      }),
+    ]);
+
+    this.logger.log(`Payment processed for order ${orderId}: ${txRef}`);
+    return { success: true, transactionRef: txRef };
+  }
+
+  async deposit(userId: string, amount: number, externalRef: string) {
+    const wallet = await this.getWallet(userId);
+
+    await this.prisma.$transaction([
+      this.prisma.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: { increment: amount } },
+      }),
+      this.prisma.transaction.create({
+        data: {
+          transactionRef: `DEP-${nanoid(12).toUpperCase()}`,
+          toWalletId: wallet.id,
+          userId,
+          amount,
+          feeAmount: 0,
+          netAmount: amount,
+          type: TransactionType.DEPOSIT,
+          method: PaymentMethod.QR_BOLIVIA,
+          status: TransactionStatus.COMPLETED,
+          externalRef,
+          processedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return { success: true, newBalance: Number(wallet.balance) + amount };
+  }
+}
+
+@Injectable()
+export class WalletService {
+  constructor(private prisma: PrismaService) {}
+
+  async getBalance(userId: string): Promise<number> {
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    return wallet ? Number(wallet.balance) : 0;
+  }
+}
+
+@Injectable()
+export class QrService {
+  private readonly logger = new Logger(QrService.name);
+
+  constructor(private prisma: PrismaService) {}
+
+  async generateQr(orderId: string, amount: number, description: string) {
+    const qrCode = `AM${Date.now()}${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
+
+    const qr = await this.prisma.qrPayment.create({
+      data: {
+        orderId,
+        qrCode,
+        amount,
+        description,
+        expiresAt,
+        status: 'PENDING',
+      },
+    });
+
+    return {
+      qrId: qr.id,
+      qrCode,
+      amount,
+      currency: 'BOB',
+      expiresAt,
+      // QR image would be generated by BCB API in production
+      qrImageUrl: `https://api.qr-server.com/v1/create-qr-code/?data=${qrCode}&size=200x200`,
+    };
+  }
+
+  async verifyQr(qrCode: string) {
+    const qr = await this.prisma.qrPayment.findFirst({
+      where: { qrCode },
+      include: { order: true },
+    });
+
+    if (!qr) return { status: 'NOT_FOUND' };
+    if (qr.expiresAt < new Date()) return { status: 'EXPIRED' };
+    return { status: qr.status, paidAt: qr.paidAt };
+  }
+}
