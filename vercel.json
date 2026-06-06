@@ -1,8 +1,6 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "rootDirectory": "apps/web",
-  "installCommand": "cd ../.. && yarn install",
-  "buildCommand": "cd ../.. && yarn turbo run build --filter=@agromarket/web",
+  "installCommand": "yarn install",
+  "buildCommand": "cd apps/web && yarn build",
   "outputDirectory": "apps/web/.next"
 }
