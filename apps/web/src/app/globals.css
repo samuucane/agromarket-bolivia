@@ -5,6 +5,10 @@
 /* ─── AgroMarket Design System — CSS Variables ──────────────────────────── */
 @layer base {
   :root {
+    /* Font family variables (loaded via <link> in layout) */
+    --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-syne: 'Syne', system-ui, sans-serif;
+
     /* Semantic colours (light mode) */
     --background: 0 0% 100%;
     --foreground: 120 20% 10%;
