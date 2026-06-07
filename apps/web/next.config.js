@@ -4,6 +4,7 @@ const path = require('path');
 const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
+  optimizeFonts: false,
   experimental: { serverActions: { allowedOrigins: ['localhost:3001', 'agromarket.bo'] } },
   images: {
     remotePatterns: [
