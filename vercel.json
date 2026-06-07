@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
   "installCommand": "yarn install",
-  "buildCommand": "yarn build",
-  "outputDirectory": ".next"
+  "buildCommand": "cd $(git rev-parse --show-toplevel)/apps/web && yarn build",
+  "outputDirectory": "apps/web/.next"
 }
